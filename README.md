@@ -4,7 +4,7 @@
 **Xavier Riera Feliu de la Peña** | NIA  
 **Pau Reig Vaqué** | 269035
 
-## Xarxes de Sensors Sense Fils  
+### Xarxes de Sensors Sense Fils  
 ### Projecte Final  
 **Tutor:** Ferran Josep Maura Rivero
 
