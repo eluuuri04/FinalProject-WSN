@@ -1,0 +1,148 @@
+/*
+ * Copyright (c) 2016, Indian Institute of Science <http://www.iisc.ernet.in>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the Institute nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * This file is part of the Contiki operating system.
+ *
+ */
+/**
+ * \addtogroup cc2538-examples
+ * @{
+ *
+ * \defgroup cc2538-test-uart Test the CC2538 UART
+ *
+ * Demonstrates the use of the CC2538 UART with a class chat
+ *
+ * @{
+ *
+ * \file
+ * \author
+ *        Fernando Maura Rivero
+ */
+/*---------------------------------------------------------------------------*/
+#include "contiki.h"
+#include "sys/etimer.h"
+#include "dev/leds.h"
+#include "dev/uart.h"
+#include "sys/log.h"
+#include "dev/serial-line.h"
+#include <stdio.h>
+#include "net/netstack.h"
+#include "net/nullnet/nullnet.h"
+#include "net/packetbuf.h"
+#include <stdint.h>
+#include <stdlib.h>
+
+#define LOG_MODULE "App"
+#define LOG_LEVEL LOG_LEVEL_INFO
+/*---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+PROCESS(cc2538_uart_demo_process, "cc2538 uart demo");
+AUTOSTART_PROCESSES(&cc2538_uart_demo_process);
+/*---------------------------------------------------------------------------*/
+
+//static linkaddr_t dest_addr =         {{ 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }};
+
+
+
+void input_callback(const void *data, uint16_t len,
+  const linkaddr_t *src, const linkaddr_t *dest)
+{
+   
+
+ //
+ 
+ printf("msg from ");
+LOG_INFO_LLADDR(src);
+ printf("\n\t");
+ uint8_t *buf_rx = malloc(len);
+ buf_rx = packetbuf_dataptr();
+ for (int i = 0; i<len;i++)
+ {	
+ 
+ 	char c = buf_rx[i];
+ 	
+    	if(c =='\0')
+	    	{
+	    	printf("\n");
+	    	break;
+    	}
+    	printf("%c", c);
+ 
+ }
+ 
+ 
+ 
+ //printf("%c %c %c %c %c \n", buf_rx[0], buf_rx[1], buf_rx[2], buf_rx[3], buf_rx[4]);
+//free(buf_rx);
+
+
+}
+/*---------------------------------------------------------------------------*/
+PROCESS_THREAD(cc2538_uart_demo_process, ev, data)
+{
+  char *rxdata;
+  static struct etimer et;
+  static uint8_t buffer_bytes[50];
+  PROCESS_BEGIN();
+ 
+  nullnet_set_input_callback(input_callback);
+  nullnet_buf = (uint8_t*)&buffer_bytes;
+  nullnet_len = sizeof(buffer_bytes);
+  
+  
+  uart_set_input(0, serial_line_input_byte);
+  
+  
+  while(1) {
+    etimer_set(&et, 3* CLOCK_SECOND);
+    PROCESS_YIELD();
+    if(ev == serial_line_event_message) {
+      leds_toggle(LEDS_RED);
+      rxdata = data;
+      printf("Data received over UART %s\n", rxdata);
+      
+      memcpy(buffer_bytes, rxdata, strlen(rxdata));
+
+      nullnet_len = strlen(rxdata); //length of buffer to send data
+      nullnet_buf = (uint8_t *)&buffer_bytes;    //content of buffer to send data
+ 
+      NETSTACK_NETWORK.output(NULL);   //Send the data 
+      
+
+    }
+    
+  }
+
+  PROCESS_END();
+}
+/*---------------------------------------------------------------------------*/
+/**
+ * @}
+ * @}
+ */
+

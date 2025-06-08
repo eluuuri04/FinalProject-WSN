@@ -1,0 +1,120 @@
+/*
+ * Copyright (c) 2016, Indian Institute of Science <http://www.iisc.ernet.in>
+ * All rights reserved.
+ *
+ * Aquest codi ha estat modificat per implementar la comunicació entre
+ * un procés lector de UART i un procés emissor de ràdio.
+ *
+ * Fitxer original de Contiki, adaptat per a una finalitat específica.
+ */
+
+#include "contiki.h"
+#include "sys/etimer.h"
+#include "dev/leds.h"
+#include "dev/uart.h"
+#include "sys/log.h"
+#include "dev/serial-line.h"
+#include <stdio.h>
+#include <string.h>      // Per memcpy i strlen
+#include "net/netstack.h"
+#include "net/nullnet/nullnet.h"
+#include "net/packetbuf.h"
+#include <stdint.h>
+#include <stdlib.h>
+
+#define LOG_MODULE "App"
+#define LOG_LEVEL LOG_LEVEL_INFO
+
+// Declarem els dos processos que es faran servir:
+// 1) Per llegir dades de l'Arduino per UART
+// 2) Per enviar aquestes dades per ràdio
+PROCESS(arduino_reader_process, "Arduino UART Reader");
+PROCESS(radio_sender_process, "Radio Sender");
+
+// Iniciem automàticament ambdós processos en arrencar
+AUTOSTART_PROCESSES(&arduino_reader_process, &radio_sender_process);
+
+// Adreça del dispositiu (pot ser útil per a comunicacions específiques)
+linkaddr_t address = {{0x00, 0x12, 0x4b, 0x00, 0x19, 0x35, 0x61, 0xd9}};
+
+// Definim un esdeveniment personalitzat per comunicar els processos
+static process_event_t event_data_from_arduino;
+
+/* Callback que s'executa quan arriba un paquet per ràdio (NullNet) */
+void input_callback(const void *data, uint16_t len,
+  const linkaddr_t *src, const linkaddr_t *dest)
+{
+    // Per debug o indicació visual: fa parpellejar el LED blau quan arriba un paquet
+    leds_toggle(LEDS_BLUE);
+}
+
+/* Procés que llegeix dades de l'Arduino via UART1 */
+PROCESS_THREAD(arduino_reader_process, ev, data)
+{
+  PROCESS_BEGIN();
+
+  // Assignem un ID únic a l'esdeveniment personalitzat
+  event_data_from_arduino = process_alloc_event();
+
+  // Configura la UART1 per rebre dades byte a byte i crear línies completes
+  uart_set_input(1, serial_line_input_byte);
+
+  printf("Arduino reader process started.\n");
+
+  while(1) {
+    // Esperem que arribi una línia completa per UART
+    PROCESS_WAIT_EVENT_UNTIL(ev == serial_line_event_message);
+
+    // Quan arriba una línia, només confirmem la recepció per consola
+    printf("Data received from Arduino.\n");
+
+    // Enviem les dades al procés emissor per a que les enviï per ràdio
+    process_post(&radio_sender_process, event_data_from_arduino, data);
+  }
+
+  PROCESS_END();
+}
+
+/* Procés que envia les dades rebudes per ràdio amb NullNet */
+PROCESS_THREAD(radio_sender_process, ev, data)
+{
+  // Buffer local per emmagatzemar les dades a enviar per ràdio
+  static uint8_t radio_buffer[100];
+
+  PROCESS_BEGIN();
+
+  // Configurem el callback que s'activa quan es reben paquets per ràdio
+  nullnet_set_input_callback(input_callback);
+
+  printf("Radio sender process started.\n");
+
+  while(1) {
+    // Esperem que el procés lector ens avisi que hi ha dades noves a enviar
+    PROCESS_WAIT_EVENT_UNTIL(ev == event_data_from_arduino);
+
+    // Convertim el punter a les dades rebudes a cadena de caràcters
+    char *data_to_send = (char *)data;
+
+    // Calculem la llargada de la cadena
+    size_t data_len = strlen(data_to_send);
+
+    // Copiem les dades al buffer local per assegurar la integritat
+    memcpy(radio_buffer, data_to_send, data_len);
+
+    // Assignem el buffer i la llargada a NullNet per enviar
+    nullnet_buf = radio_buffer;
+    nullnet_len = data_len;
+
+    // Print senzill per indicar que s'està enviant dades
+    printf("Sending data...\n");
+
+    // Enviem les dades per ràdio (broadcast, sense adreça específica)
+    NETSTACK_NETWORK.output(NULL);
+
+    // Parpellegem el LED vermell per indicar l’enviament
+    leds_toggle(LEDS_RED);
+  }
+
+  PROCESS_END();
+}
+
