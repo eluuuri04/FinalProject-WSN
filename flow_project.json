@@ -1,0 +1,118 @@
+[
+    {
+        "id": "ef51507d26976870",
+        "type": "tab",
+        "label": "Flujo 8",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "233d6ad3916cae65",
+        "type": "serial in",
+        "z": "ef51507d26976870",
+        "name": "",
+        "serial": "eb29c4b50afc903b",
+        "x": 150,
+        "y": 200,
+        "wires": [
+            [
+                "8127864478b83f2d",
+                "41820b3aed51b4f6"
+            ]
+        ]
+    },
+    {
+        "id": "88a5e89f7de9804c",
+        "type": "function",
+        "z": "ef51507d26976870",
+        "name": "log format",
+        "func": "let d = msg.payload;\nmsg.payload = `Temps: ${d.timestamp}\nHumitat aire: ${d.humitat_aire} %\nTemperatura aire: ${d.temperatura_aire} °C\nHumitat sorra: ${d.humitat_sorra} %\nTemperatura sorra: ${d.temperatura_sorra} °C\n-----------------------------\\n`;\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 600,
+        "y": 120,
+        "wires": [
+            [
+                "69270afd33301aed"
+            ]
+        ]
+    },
+    {
+        "id": "69270afd33301aed",
+        "type": "file",
+        "z": "ef51507d26976870",
+        "name": "",
+        "filename": "SensorData/ProjectData.txt",
+        "filenameType": "str",
+        "appendNewline": true,
+        "createDir": false,
+        "overwriteFile": "false",
+        "encoding": "none",
+        "x": 860,
+        "y": 120,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "41820b3aed51b4f6",
+        "type": "function",
+        "z": "ef51507d26976870",
+        "name": "parse data",
+        "func": "// Comprova que el missatge conté dades\nif (!msg.payload.includes(\",\")) {\n    return null;\n}\n\n// Extreu les dades abans de \"msg from\"\nlet data = msg.payload.split(\"msg\")[0].trim().split(',');\n\n// Comprova que hi ha exactament 4 valors\nif (data.length !== 4) {\n    node.warn(\"Invalid data format: \" + msg.payload);\n    return null;\n}\n\n// Hora actual en format ISO (correcte per a timestamp)\nlet timestamp = new Date().toISOString();\n\nmsg.payload = {\n    timestamp: timestamp,  // <-- aquest és el nom que espera el segon node\n    humitat_aire: parseFloat(data[0]),\n    temperatura_aire: parseFloat(data[1]),\n    humitat_sorra: parseFloat(data[2]),\n    temperatura_sorra: parseFloat(data[3])\n};\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 390,
+        "y": 120,
+        "wires": [
+            [
+                "88a5e89f7de9804c"
+            ]
+        ]
+    },
+    {
+        "id": "8127864478b83f2d",
+        "type": "debug",
+        "z": "ef51507d26976870",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 300,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "eb29c4b50afc903b",
+        "type": "serial-port",
+        "name": "",
+        "serialport": "COM11",
+        "serialbaud": "115200",
+        "databits": 8,
+        "parity": "none",
+        "stopbits": 1,
+        "waitfor": "",
+        "dtr": "none",
+        "rts": "none",
+        "cts": "none",
+        "dsr": "none",
+        "newline": "\\n",
+        "bin": "false",
+        "out": "char",
+        "addchar": "",
+        "responsetimeout": 10000
+    }
+]
